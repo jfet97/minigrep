@@ -1,6 +1,6 @@
+use std::env;
 use std::error::Error;
 use std::fs;
-use std::env;
 
 pub struct Config {
     query: String,
@@ -9,18 +9,28 @@ pub struct Config {
 }
 
 impl Config {
-    // forces to return a slice of a static string
-    pub fn build_from_slice(args: &[String]) -> Result<Config, &'static str> {
-        if args.len() < 3 {
-            return Err("not enough arguments");
-        }
+    // forced to return a slice of a static string
+    // we’re taking ownership of args and we’ll be mutating args
+    pub fn build(mut args: impl Iterator<Item = String>) -> Result<Config, &'static str> {
+        // ignore the name of the program
+        args.next();
 
-        // cannot take ownership of an element inside a collection:
-        // it would leave it in an invalid state: one element is moved out, the others are not
+        let query = match args.next() {
+            Some(arg) => arg,
+            None => return Err("Didn't get a query string"),
+        };
+
+        let file_path = match args.next() {
+            Some(arg) => arg,
+            None => return Err("Didn't get a file path"),
+        };
+
+        let case_insensitive = env::var("IGNORE_CASE").is_ok();
+
         Ok(Config {
-            query: args[1].clone(),
-            file_path: args[2].clone(),
-            case_insensitive: env::var("CASE_INSENSITIVE").is_ok(),
+            query,
+            file_path,
+            case_insensitive,
         })
     }
 }
@@ -44,15 +54,10 @@ pub fn run(config: Config) -> Result<(), Box<dyn Error>> {
 // In other words, we tell Rust that the data returned by the search
 // function will live as long as the data passed into the search function in the contents argument.
 pub fn search<'a>(query: &str, contents: &'a str) -> Vec<&'a str> {
-    let mut results = Vec::new();
-
-    for line in contents.lines() {
-        if line.contains(query) {
-            results.push(line);
-        }
-    }
-
-    results
+    contents
+        .lines()
+        .filter(|line| line.contains(query))
+        .collect()
 }
 
 pub fn search_case_insensitive<'a>(query: &str, contents: &'a str) -> Vec<&'a str> {
